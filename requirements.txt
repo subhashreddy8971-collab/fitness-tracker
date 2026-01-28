@@ -1,0 +1,9 @@
+python-telegram-bot
+google-generativeai
+sqlalchemy
+psycopg2-binary
+openpyxl
+pandas
+matplotlib
+python-dotenv
+aiohttp
