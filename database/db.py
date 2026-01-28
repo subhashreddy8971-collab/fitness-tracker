@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 from config import DATABASE_URL
 
 # For development purposes, fallback to sqlite if no DATABASE_URL is provided or if it's the example one
@@ -20,4 +19,6 @@ def get_db():
         db.close()
 
 def init_db():
+    # Import models here to ensure they are registered with Base.metadata before creation
+    from database import models
     Base.metadata.create_all(bind=engine)

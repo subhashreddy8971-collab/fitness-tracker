@@ -27,7 +27,14 @@ class GeminiService:
                 response = await asyncio.to_thread(self.model.generate_content, inputs)
                 return response
             except Exception as e:
-                logger.warning(f"Gemini API attempt {attempt+1} failed: {e}")
+                error_str = str(e)
+                if "429" in error_str or "quota" in error_str.lower():
+                    logger.warning(f"Rate limit hit on attempt {attempt+1}")
+                    if attempt == max_retries - 1:
+                        return "RATE_LIMIT"
+                else:
+                    logger.warning(f"Gemini API attempt {attempt+1} failed: {e}")
+                
                 if attempt < max_retries - 1:
                     await asyncio.sleep(delay)
         return None
@@ -59,6 +66,9 @@ class GeminiService:
             sample_file = genai.upload_file(path=image_path, display_name="User Upload")
             response = await self._generate_with_retry([prompt, sample_file])
             
+            if response == "RATE_LIMIT":
+                return {"type": "error", "reply": "My brain is tired (Rate Limit). Please try again in 1 minute! 🧠💤"}
+            
             if response:
                 text = response.text.replace("```json", "").replace("```", "").strip()
                 return json.loads(text)
@@ -70,25 +80,6 @@ class GeminiService:
         """
         Conversational response with database context.
         """
-        prompt = f"""
-        System: You are an encouraging, casual Fitness AI Coach.
-        Context: {context_data}
-        User: "{user_text}"
-        
-        Task:
-        1. If user is logging something not in the context, extract it to JSON format at the END of your response.
-        2. Otherwise, just chat/advise naturally.
-        
-        Output Format:
-        [Natural Reply]
-        ~JSON~ (Only if extracting data, otherwise omit)
-        {{ "type": "meal", "data": {{...}} }}
-        """
-        
-        # We'll use a simpler prompt for pure chat to save tokens/complexity, 
-        # relying on the SmartParser for basic logging first.
-        # This fallback is for complex queries or "What should I eat?"
-        
         final_prompt = f"""
         Role: Fitness Coach. Tone: Encouraging, concise.
         User Data/Stats: {context_str}
@@ -99,4 +90,8 @@ class GeminiService:
         """
         
         response = await self._generate_with_retry(final_prompt)
+        
+        if response == "RATE_LIMIT":
+            return "My brain is tired (Rate Limit). Please try again in 1 minute! 🧠💤"
+            
         return response.text if response else "I'm having trouble thinking right now. Try again?"

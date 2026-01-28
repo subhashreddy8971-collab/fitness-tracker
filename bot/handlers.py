@@ -74,9 +74,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 3. HANDLE TEXT
     elif update.message.text:
         text = update.message.text.strip()
+        text_lower = text.lower()
         
         # A. Local Greeting (Zero Cost)
-        if text.lower() in ['/start', 'hi', 'hello', 'hey', 'help']:
+        if text_lower in ['/start', 'hi', 'hello', 'hey', 'yo', 'sup', 'help', 'start']:
             response_text = (
                 f"Hey {user.first_name}! 👋\n"
                 "I'm ready to track. Just send me:\n"
@@ -88,7 +89,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db.close()
             return
 
-        # B. Try Smart Parser (Zero Cost)
+        # B. Local Data Query (Zero Cost)
+        if text_lower in ['stats', 'summary', 'calories', 'how many calories', 'how many calories today', 'progress']:
+            totals = get_daily_totals(db_user.id)
+            response_text = (
+                f"📊 *Today's Stats:*\n"
+                f"🔥 Calories: {totals['calories_in']:.0f} In / {totals['calories_out']:.0f} Out\n"
+                f"🥩 Protein: {totals['protein']:.1f}g\n"
+                f"💪 Workouts: {totals['workout_count']}\n"
+                f"⚖️ Weight: {totals['weight'] or 'Not logged'} kg"
+            )
+            await update.message.reply_text(response_text, parse_mode="Markdown")
+            db.close()
+            return
+
+        # C. Try Smart Parser (Zero Cost)
         food_data = SmartParser.parse_food(text)
         workout_data = SmartParser.parse_workout(text)
         
@@ -97,8 +112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db.add(m)
             db.commit()
             response_text = (
-                f"✅ Logged: {food_data['food_name']}
-"
+                f"✅ Logged: {food_data['food_name']}\n"
                 f"🔥 {food_data['calories']} cal | 🥩 {food_data['protein']}g protein"
             )
             
@@ -107,8 +121,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             db.add(w)
             db.commit()
             response_text = (
-                f"💪 Logged: {workout_data['exercise_name']}
-"
+                f"💪 Logged: {workout_data['exercise_name']}\n"
                 f"⏱ {workout_data['duration_minutes']} min | 🔥 {workout_data['calories_burned']} cal"
             )
             
@@ -119,16 +132,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Build Context
             totals = get_daily_totals(db_user.id)
             context = (
-                f"Date: {datetime.now().strftime('%A, %d %b')}
-"
-                f"Today's Stats:
-"
-                f"- Calories: {totals['calories_in']:.0f} In / {totals['calories_out']:.0f} Out
-"
-                f"- Protein: {totals['protein']:.1f}g
-"
-                f"- Workouts: {totals['workout_count']}
-"
+                f"Date: {datetime.now().strftime('%A, %d %b')}\n"
+                f"Today's Stats:\n"
+                f"- Calories: {totals['calories_in']:.0f} In / {totals['calories_out']:.0f} Out\n"
+                f"- Protein: {totals['protein']:.1f}g\n"
+                f"- Workouts: {totals['workout_count']}\n"
                 f"- Current Weight: {totals['weight'] or 'Unknown'} kg"
             )
             
